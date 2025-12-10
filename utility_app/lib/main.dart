@@ -1,11 +1,12 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:utility_app/features/auth/views/splash_screen.dart';
+import 'package:utility_app/firebase_options.dart';
 
-import 'features/auth/views/login_screen.dart';
-import 'features/auth/views/signup_screen.dart';
-import 'features/auth/views/splash_screen.dart';
-import 'routing/app_routes.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-void main() {
   runApp(const MyApp());
 }
 
@@ -15,18 +16,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Smart Utility Monitor',
+      title: 'Smart Public Utility App',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xfff5f5f5),
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: Color(0xFF057060),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
       ),
-
-      // all routes hai yahan to understand
-      initialRoute: AppRoutes.splash,
-      routes: {
-        AppRoutes.splash: (context) => const SplashScreen(),
-        AppRoutes.signup: (context) => const SignupScreen(),
-        AppRoutes.login: (context) => const LoginScreen(),
-      },
+      home: const SplashScreen(),
     );
   }
 }
