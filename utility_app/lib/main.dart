@@ -15,8 +15,8 @@ Future<void> main() async {
 
   // >>> ENABLE APP CHECK PROPERLY (IMPORTANT) <<<
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity,
-    appleProvider: AppleProvider.deviceCheck,
+    providerAndroid: AndroidPlayIntegrityProvider(),
+    providerApple: AppleDeviceCheckProvider(),
     
   );
 

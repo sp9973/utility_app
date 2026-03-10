@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -27,6 +27,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   File? _pickedImage;
+  bool _isLoading = false;
 
   /// Pick image from gallery
   Future<void> _pickImage() async {
@@ -34,6 +35,8 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     final pickedFile = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 50,
+      maxWidth: 800,
+      maxHeight: 800,
     );
 
     if (pickedFile != null) {
@@ -46,22 +49,23 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
     }
   }
 
-  /// Upload image to Firebase Storage and return URL
+  /// Encode image as base64 and return data URI
   Future<String?> _uploadImage(String reportId) async {
-    if (_pickedImage == null) return null;
+  if (_pickedImage == null) return null;
 
-    try {
-      final ref = FirebaseStorage.instance.ref('report_images/$reportId.jpg');
-      final uploadTask = ref.putFile(_pickedImage!);
-      final snapshot = await uploadTask.whenComplete(() {});
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      print("Uploaded image URL: $downloadUrl");
-      return downloadUrl;
-    } catch (e) {
-      print("Image upload failed: $e");
-      return null;
-    }
+  try {
+    File file = _pickedImage!;
+
+    print("Encoding file: ${file.path}");
+    final bytes = await file.readAsBytes();
+    final base64Image = base64Encode(bytes);
+    
+    return "data:image/jpeg;base64,$base64Image";
+  } catch (e) {
+    print("Image upload failed: $e");
+    return null;
   }
+}
 
   /// Submit issue to Firestore
   void _submitIssue() async {
@@ -69,40 +73,47 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      final reportId = const Uuid().v4();
-
-      // Upload image if selected
-      String? imageUrl = await _uploadImage(reportId);
-
-      final newReport = ReportModel(
-        id: reportId,
-        title: _titleController.text,
-        description: _descController.text,
-        category: _selectedCategory!,
-        reporterName: user.email ?? '',
-        reporterId: user.uid,
-        imagePath: imageUrl ?? '',
-      );
-
+      setState(() => _isLoading = true);
+      
       try {
+        final reportId = const Uuid().v4();
+
+        // Upload image if selected
+        String? imageUrl = await _uploadImage(reportId);
+
+        final newReport = ReportModel(
+          id: reportId,
+          title: _titleController.text,
+          description: _descController.text,
+          category: _selectedCategory!,
+          reporterName: user.email ?? '',
+          reporterId: user.uid,
+          imagePath: imageUrl ?? '',
+        );
+
         await _firestore
             .collection('reports')
             .doc(reportId)
             .set(newReport.toJson());
+            
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Issue reported successfully!")),
         );
         Navigator.pop(context);
       } catch (e) {
         print("Failed to save report: $e");
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Failed to submit issue")));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to submit issue")),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     } else if (_selectedCategory == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please select a category")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a category")),
+      );
     }
   }
 
@@ -206,14 +217,20 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.send),
-                      label: const Text(
-                        "Submit Issue",
-                        style: TextStyle(color: Colors.white),
+                      icon: _isLoading 
+                          ? const SizedBox(
+                              width: 20, height: 20, 
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                            ) 
+                          : const Icon(Icons.send),
+                      label: Text(
+                        _isLoading ? "Submitting..." : "Submit Issue",
+                        style: const TextStyle(color: Colors.white),
                       ),
-                      onPressed: _submitIssue,
+                      onPressed: _isLoading ? null : _submitIssue,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF057060),
+                        disabledBackgroundColor: const Color(0xFF057060).withValues(alpha: 0.6),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),

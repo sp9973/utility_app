@@ -1,0 +1,6 @@
+﻿Analyzing main.dart...                                          
+
+  error - The getter 'playIntegrity' isn't defined for the type 'AndroidAppCheckProvider' - lib\main.dart:18:46 - undefined_getter
+  error - The getter 'deviceCheck' isn't defined for the type 'AppleAppCheckProvider' - lib\main.dart:19:42 - undefined_getter
+   info - Don't invoke 'print' in production code - lib\main.dart:34:7 - avoid_print
+
