@@ -19,7 +19,7 @@ class ReportService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => ReportModel.fromJson(doc.data() as Map<String, dynamic>)).toList());
+            snapshot.docs.map((doc) => ReportModel.fromJson(doc.data())).toList());
   }
 
   // Get all reports (for Authority dashboard)
@@ -29,7 +29,7 @@ class ReportService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => ReportModel.fromJson(doc.data() as Map<String, dynamic>)).toList());
+            snapshot.docs.map((doc) => ReportModel.fromJson(doc.data())).toList());
   }
 
   // Update status of a report

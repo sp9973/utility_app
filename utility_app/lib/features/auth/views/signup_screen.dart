@@ -41,6 +41,7 @@ class _SignupScreenState extends State<SignupScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Account created successfully as $selectedRole!'),
@@ -61,11 +62,12 @@ class _SignupScreenState extends State<SignupScreen> {
         errorMsg = 'Invalid email format.';
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(errorMsg)));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -117,7 +119,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -153,10 +155,12 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty)
+                              if (val == null || val.isEmpty) {
                                 return 'Email is required';
-                              if (!val.contains('@'))
+                              }
+                              if (!val.contains('@')) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                             onSaved: (val) => email = val!.trim(),
@@ -193,8 +197,9 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty)
+                              if (val == null || val.isEmpty) {
                                 return 'Password is required';
+                              }
                               if (val.length < 6) return 'Minimum 6 characters';
                               return null;
                             },

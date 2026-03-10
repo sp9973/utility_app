@@ -1,14 +1,17 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../citizen/models/report_model.dart';
+import 'package:utility_app/features/citizen/models/report_model.dart';
+import 'package:utility_app/features/citizen/views/report_issue_screen.dart';
 
 class TrackReportScreen extends StatelessWidget {
   TrackReportScreen({super.key});
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final bool useDemoData = true;
+  final bool useDemoData = false;
 
   Stream<List<ReportModel>> _getUserOrDemoReports(String userId) {
     if (useDemoData) {
@@ -28,19 +31,23 @@ class TrackReportScreen extends StatelessWidget {
     }
 
     if (userId.isEmpty) return Stream.value(<ReportModel>[]);
+
+    // ✅ No orderBy here — avoids composite index requirement.
+    //    We sort client-side after receiving the list.
     return _firestore
         .collection('reports')
         .where('reporterId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs.map((doc) {
-                final data = doc.data();
-                data['id'] = doc.id;
-                return ReportModel.fromJson(data);
-              }).toList(),
-        );
+        .map((snapshot) {
+          final list = snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return ReportModel.fromJson(data);
+          }).toList();
+          // Sort by newest first on the client
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   String _currentUserId() => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -61,11 +68,47 @@ class TrackReportScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load reports',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                'No reports to show (demo mode)',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment_outlined, size: 80, color: Colors.grey.shade400),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No reports found',
+                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Have an issue? Tap + to report it!',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                  ),
+                ],
               ),
             );
           }
@@ -76,12 +119,7 @@ class TrackReportScreen extends StatelessWidget {
             itemCount: reports.length,
             itemBuilder: (context, index) {
               final r = reports[index];
-              final createdAt =
-                  (r.createdAt is DateTime)
-                      ? r.createdAt
-                      : (r.createdAt is Timestamp
-                          ? (r.createdAt as Timestamp).toDate()
-                          : DateTime.now());
+              final createdAt = r.createdAt;
               final formattedDate =
                   '${createdAt.day}/${createdAt.month}/${createdAt.year}';
 
@@ -159,6 +197,21 @@ class TrackReportScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      if (r.imagePath.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: r.imagePath.startsWith('http')
+                              ? Image.network(r.imagePath,
+                                  height: 120, width: double.infinity, fit: BoxFit.cover)
+                              : r.imagePath.startsWith('data:image')
+                                  ? Image.memory(
+                                      base64Decode(r.imagePath.split(',').last),
+                                      height: 120, width: double.infinity, fit: BoxFit.cover,
+                                    )
+                                  : const SizedBox.shrink(),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       // Footer: Date + Reporter
                       Row(
                         children: [
@@ -196,6 +249,17 @@ class TrackReportScreen extends StatelessWidget {
                 ),
               );
             },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF057060),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReportIssueScreen()),
           );
         },
       ),

@@ -55,6 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       print('Logged in user role: $role'); // 🔹 For debugging
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Login successful!')));
@@ -98,15 +99,17 @@ class _LoginScreenState extends State<LoginScreen> {
         errorMsg = 'Invalid email format.';
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(errorMsg)));
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -155,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -189,10 +192,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty)
+                              if (val == null || val.isEmpty) {
                                 return 'Email is required';
-                              if (!val.contains('@'))
+                              }
+                              if (!val.contains('@')) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                             onSaved: (val) => email = val!.trim(),
@@ -227,8 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty)
+                              if (val == null || val.isEmpty) {
                                 return 'Password is required';
+                              }
                               return null;
                             },
                             onSaved: (val) => password = val!.trim(),

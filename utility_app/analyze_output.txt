@@ -1,0 +1,41 @@
+﻿Analyzing utility_app...                                        
+
+   info - The file name 'local_issue-repository.dart' isn't a lower_case_with_underscores identifier - lib\core\repository\local_issue-repository.dart:1:1 - file_names
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\admin\views\admin_dashboard.dart:67:17 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\admin\views\admin_dashboard.dart:68:17 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\views\admin_dashboard.dart:268:66 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\views\admin_dashboard.dart:281:72 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\views\admin_dashboard.dart:284:76 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\views\admin_dashboard.dart:355:22 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\views\admin_dashboard.dart:378:40 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\features\auth\views\login_screen.dart:56:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:59:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:66:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:74:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:82:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:102:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\login_screen.dart:106:9 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\views\login_screen.dart:158:47 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\signup_screen.dart:44:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\signup_screen.dart:51:9 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\signup_screen.dart:65:9 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\views\signup_screen.dart:120:47 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\splash_screen.dart:41:39 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\splash_screen.dart:45:39 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\auth\views\splash_screen.dart:49:39 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\features\auth\views\splash_screen.dart:55:9 - avoid_print
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\authority\views\authority_dashboard.dart:317:48 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\citizen\views\leader_board.dart:216:64 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\features\citizen\views\report_issue_screen.dart:45:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\features\citizen\views\report_issue_screen.dart:47:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\features\citizen\views\report_issue_screen.dart:58:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\features\citizen\views\report_issue_screen.dart:64:5 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\features\citizen\views\report_issue_screen.dart:95:30 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\citizen\views\report_issue_screen.dart:98:23 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\features\citizen\views\report_issue_screen.dart:100:9 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\features\citizen\views\report_issue_screen.dart:102:11 - use_build_context_synchronously
+warning - Unnecessary type check; the result is always 'true' - lib\features\citizen\views\track_report_screen.dart:82:20 - unnecessary_type_check
+   info - 'androidProvider' is deprecated and shouldn't be used. Use providerAndroid instead. This parameter will be removed in a future major release - lib\main.dart:18:5 - deprecated_member_use
+   info - 'appleProvider' is deprecated and shouldn't be used. Use providerApple instead. This parameter will be removed in a future major release - lib\main.dart:19:5 - deprecated_member_use
+   info - Don't invoke 'print' in production code - lib\main.dart:34:7 - avoid_print
+
