@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:utility_app/features/auth/views/login_screen.dart';
 import 'package:utility_app/features/citizen/citizen_service.dart';
 import 'package:utility_app/features/citizen/views/leader_board.dart';
@@ -57,6 +58,31 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
     }
     
     if (mounted) setState(() => _loadingStats = false);
+  }
+
+  Future<void> _openGoogleMaps() async {
+    // 1st try: geo: URI — opens the Google Maps app directly on Android.
+    // 2nd try: https fallback — opens in the browser if Maps app isn't found.
+    final Uri geoUrl  = Uri.parse('geo:0,0?q=city+utility+issues');
+    final Uri webUrl  = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=city+utility+issues');
+
+    try {
+      if (await canLaunchUrl(geoUrl)) {
+        await launchUrl(geoUrl);
+      } else if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // Last resort: force-open as a plain browser link
+        await launchUrl(webUrl, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open Maps: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -232,6 +258,95 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                     Text(
                       "$nearbyIssues recent issues in the city",
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // ── Map Section ──────────────────────────────────────────────
+              const Text(
+                "City Map",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0BA4E0), Color(0xFF057060)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.teal.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                child: Row(
+                  children: [
+                    // Map pin icon in a circle
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.map_outlined,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Text column
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "View Issues on Map",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "See reported problems across the city",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Open Maps button
+                    ElevatedButton.icon(
+                      onPressed: _openGoogleMaps,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF057060),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text(
+                        "Open Map",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),

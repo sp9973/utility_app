@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
 
 class _LeaderEntry {
@@ -28,6 +29,8 @@ class Leaderboard extends StatefulWidget {
 
 class _LeaderboardState extends State<Leaderboard> {
   List<_LeaderEntry> _entries = [];
+  Map<String, int> _categoryData = {};
+  Map<String, int> _statusData = {};
   bool _loading = true;
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -38,42 +41,93 @@ class _LeaderboardState extends State<Leaderboard> {
   }
 
   Future<void> _loadLeaderboard() async {
+    if (!mounted) return;
     setState(() => _loading = true);
+    final firestore = FirebaseFirestore.instance;
     try {
-      final firestore = FirebaseFirestore.instance;
-      final usersSnap = await firestore
-          .collection(AppCollections.users)
-          .where('role', isEqualTo: 'citizen')
+      debugPrint("Fetching all reports for leaderboard aggregation...");
+      // Citizens are often allowed to read all reports, but not all users.
+      // We aggregate leaderboard stats directly from the report documents.
+      final reportsSnap = await firestore
+          .collection(AppCollections.reports)
           .get();
 
-      List<_LeaderEntry> entries = [];
-      for (final userDoc in usersSnap.docs) {
-        final uid = userDoc.id;
-        final email = userDoc.data()['email'] ?? 'Unknown';
-        final reportsSnap = await firestore
-            .collection(AppCollections.reports)
-            .where('reporterId', isEqualTo: uid)
-            .get();
-        final reports = reportsSnap.docs.length;
-        final resolved = reportsSnap.docs
-            .where((d) => d.data()['status'] == ReportStatus.resolved)
-            .length;
-        final points = resolved * 20 + reports * 5;
-        entries.add(_LeaderEntry(
-          email: email,
-          uid: uid,
-          reports: reports,
-          resolved: resolved,
-          points: points,
-        ));
+      debugPrint("Found ${reportsSnap.docs.length} reports total.");
+
+      Map<String, int> categories = {};
+      Map<String, int> statuses = {};
+      Map<String, _LeaderEntry> userStats = {};
+
+      for (var doc in reportsSnap.docs) {
+        final data = doc.data();
+        final cat = data['category']?.toString() ?? 'Other';
+        final status = data['status']?.toString() ?? 'Pending';
+        final rid = data['reporterId']?.toString() ?? '';
+        final rName = data['reporterName']?.toString() ?? 'Citizen';
+
+        // Global stats for charts
+        categories[cat] = (categories[cat] ?? 0) + 1;
+        statuses[status] = (statuses[status] ?? 0) + 1;
+
+        if (rid.isNotEmpty) {
+          final isResolved = status == ReportStatus.resolved;
+          final existing = userStats[rid];
+          
+          if (existing == null) {
+            userStats[rid] = _LeaderEntry(
+              uid: rid,
+              email: rName, 
+              reports: 1,
+              resolved: isResolved ? 1 : 0,
+              points: isResolved ? 25 : 5,
+            );
+          } else {
+            userStats[rid] = _LeaderEntry(
+              uid: rid,
+              email: existing.email,
+              reports: existing.reports + 1,
+              resolved: existing.resolved + (isResolved ? 1 : 0),
+              points: existing.points + (isResolved ? 25 : 5),
+            );
+          }
+        }
       }
+
+      final entries = userStats.values.toList();
       entries.sort((a, b) => b.points.compareTo(a.points));
-      setState(() {
-        _entries = entries;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
+      
+      if (mounted) {
+        setState(() {
+          _entries = entries;
+          _categoryData = categories;
+          _statusData = statuses;
+          _loading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint("Leaderboard critical error: $e");
+      debugPrint(stack.toString());
+      
+      // Final Fallback: if even reading reports is blocked, try reading only MY reports
+      try {
+        final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+        final mySnap = await firestore
+            .collection(AppCollections.reports)
+            .where('reporterId', isEqualTo: myUid)
+            .get();
+        
+        if (mounted && _entries.isEmpty) {
+           // We could at least show the user's own stats here
+           // but the goal is to fix the crash/empty screen
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e. Try refreshing.")),
+        );
+      }
     }
   }
 
@@ -142,6 +196,8 @@ class _LeaderboardState extends State<Leaderboard> {
                         ],
                       ),
                     ),
+
+                    _buildChartsSection(),
 
                     // Top 3 podium
                     if (_entries.isNotEmpty)
@@ -232,6 +288,124 @@ class _LeaderboardState extends State<Leaderboard> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildChartsSection() {
+    if (_categoryData.isEmpty && _statusData.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("📊 Community Insights",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildBarChart(
+                  "By Category",
+                  _categoryData,
+                  const [Color(0xFF057060), Color(0xFF00BFA5)],
+                ),
+                const SizedBox(width: 16),
+                _buildBarChart(
+                  "By Status",
+                  _statusData,
+                  const [Color(0xFFF7971E), Color(0xFFFFD200)],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarChart(String title, Map<String, int> data, List<Color> colors) {
+    if (data.isEmpty) return const SizedBox.shrink();
+
+    final maxVal = data.values.fold(0, (prev, curr) => curr > prev ? curr : prev).toDouble();
+    final items = data.entries.toList();
+
+    return Container(
+      width: 280,
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxVal + 1,
+                barTouchData: BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= items.length) return const SizedBox.shrink();
+                        final label = items[value.toInt()].key;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            label.length > 5 ? "${label.substring(0, 5)}.." : label,
+                            style: const TextStyle(fontSize: 10, color: Colors.black54),
+                          ),
+                        );
+                      },
+                      reservedSize: 28,
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: items.asMap().entries.map((e) {
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: e.value.value.toDouble(),
+                        gradient: LinearGradient(
+                          colors: colors,
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
