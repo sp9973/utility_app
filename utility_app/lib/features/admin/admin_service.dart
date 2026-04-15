@@ -63,4 +63,11 @@ class AdminService {
         .doc(reportId)
         .delete();
   }
+
+  Future<void> updateStatus(String reportId, String newStatus) async {
+    await _firestore
+        .collection(AppCollections.reports)
+        .doc(reportId)
+        .update({'status': newStatus});
+  }
 }

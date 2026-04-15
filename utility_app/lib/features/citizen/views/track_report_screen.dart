@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'package:utility_app/features/citizen/models/report_model.dart';
 import 'package:utility_app/features/citizen/views/report_issue_screen.dart';
+import 'package:utility_app/features/citizen/views/report_details_screen.dart';
 
 class TrackReportScreen extends StatelessWidget {
   TrackReportScreen({super.key});
@@ -251,11 +252,18 @@ class TrackReportScreen extends StatelessWidget {
                       // Cards
                       ...reports.asMap().entries.map((entry) {
                         final r = entry.value;
-                        return _ReportCard(
-                          report: r,
-                          statusColor: _statusColor(r.status),
-                          statusIcon: _statusIcon(r.status),
-                          categoryIcon: _categoryIcon(r.category),
+                        return InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ReportDetailsScreen(report: r)),
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          child: _ReportCard(
+                            report: r,
+                            statusColor: _statusColor(r.status),
+                            statusIcon: _statusIcon(r.status),
+                            categoryIcon: _categoryIcon(r.category),
+                          ),
                         );
                       }),
                     ],

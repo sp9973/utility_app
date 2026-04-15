@@ -6,6 +6,8 @@ import 'package:utility_app/features/citizen/citizen_service.dart';
 import 'package:utility_app/features/citizen/views/leader_board.dart';
 import 'package:utility_app/features/citizen/views/report_issue_screen.dart';
 import 'package:utility_app/features/citizen/views/track_report_screen.dart';
+import 'package:utility_app/features/citizen/views/report_details_screen.dart';
+import 'package:utility_app/features/citizen/models/report_model.dart';
 
 class CitizenHomeDashboard extends StatefulWidget {
   const CitizenHomeDashboard({super.key});
@@ -171,14 +173,30 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                       style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _getBadge(userPoints),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
                     _loadingStats
                         ? const Center(child: CircularProgressIndicator(color: Colors.white))
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _buildStatBox("My Reports", "$userReports"),
-                              _buildStatBox("Points", "$userPoints"),
-                              _buildStatBox("Rank", "#$userRank"),
+                              _buildStatBox("My Reports", "$userReports", Icons.description_outlined),
+                              _buildStatBox("Points", "$userPoints", Icons.stars_rounded),
+                              _buildStatBox("Rank", "#$userRank", Icons.leaderboard_outlined),
                             ],
                           ),
                   ],
@@ -186,6 +204,25 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
               ),
 
               const SizedBox(height: 25),
+
+              // 🌟 Latest Activity Spotlight (Real-time Stream)
+              StreamBuilder<List<ReportModel>>(
+                stream: _service.getMyReports(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+                  final report = snapshot.data!.first;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Latest Activity",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      _buildLatestReportCard(report),
+                      const SizedBox(height: 25),
+                    ],
+                  );
+                },
+              ),
 
               // Quick Actions
               const Text("Quick Actions",
@@ -358,14 +395,91 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
     );
   }
 
-  Widget _buildStatBox(String label, String value) {
-    return Column(
-      children: [
-        Text(value,
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-      ],
+  String _getBadge(int points) {
+    if (points >= 200) return "City Hero 🎖️";
+    if (points >= 100) return "Active Citizen 🏅";
+    return "New Observer 🌱";
+  }
+
+  Widget _buildStatBox(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white70, size: 18),
+          const SizedBox(height: 4),
+          Text(value,
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLatestReportCard(ReportModel r) {
+    final statusColor = r.status == 'Resolved'
+        ? const Color(0xFF10B981)
+        : r.status == 'In Progress'
+            ? const Color(0xFF3B82F6)
+            : const Color(0xFFF59E0B);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              r.status == 'Resolved'
+                  ? Icons.check_circle_rounded
+                  : r.status == 'In Progress'
+                      ? Icons.autorenew_rounded
+                      : Icons.hourglass_top_rounded,
+              color: statusColor,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  r.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                Text(
+                  "Status: ${r.status}",
+                  style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => ReportDetailsScreen(report: r)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -377,10 +491,10 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: const Color(0xFF057060).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: Colors.blueAccent, size: 26),
+            child: Icon(icon, color: const Color(0xFF057060), size: 26),
           ),
           const SizedBox(height: 6),
           Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),

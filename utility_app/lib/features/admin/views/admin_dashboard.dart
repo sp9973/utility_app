@@ -4,6 +4,7 @@ import 'package:utility_app/features/admin/admin_service.dart';
 import 'package:utility_app/features/auth/models/user_model.dart';
 import 'package:utility_app/features/auth/views/login_screen.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
+import 'package:utility_app/core/constants/app_constants.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -107,6 +108,34 @@ class _AdminDashboardState extends State<AdminDashboard>
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Report deleted')));
       }
+    }
+  }
+
+  Future<void> _changeStatus(ReportModel report) async {
+    final newStatus = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _AdminStatusPickerSheet(currentStatus: report.status),
+    );
+    if (newStatus != null && newStatus != report.status) {
+      await _service.updateStatus(report.id, newStatus);
+      await _loadStats();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Status updated to $newStatus')),
+        );
+      }
+    }
+  }
+
+  Color _statusColor(String s) {
+    switch (s) {
+      case ReportStatus.pending: return Colors.orange;
+      case ReportStatus.inProgress: return Colors.blue;
+      case ReportStatus.resolved: return Colors.green;
+      case ReportStatus.rejected: return Colors.red;
+      default: return Colors.grey;
     }
   }
 
@@ -318,23 +347,52 @@ class _AdminDashboardState extends State<AdminDashboard>
                 itemBuilder: (ctx, i) {
                   final r = reports[i];
                   return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ListTile(
+                      onTap: () => _changeStatus(r),
                       title: Text(r.title,
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("${r.category} · ${r.status}"),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _statusColor(r.status).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(r.status, style: TextStyle(
+                                  color: _statusColor(r.status),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                )),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(r.category, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(r.reporterName,
                               style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         ],
                       ),
                       isThreeLine: true,
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _deleteReport(r),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                            onPressed: () => _changeStatus(r),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () => _deleteReport(r),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -386,6 +444,32 @@ class _AdminDashboardState extends State<AdminDashboard>
           Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 24)),
           const SizedBox(height: 4),
           Text(subtitle, style: const TextStyle(color: Colors.black54, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminStatusPickerSheet extends StatelessWidget {
+  final String currentStatus;
+  const _AdminStatusPickerSheet({required this.currentStatus});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Update Status",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ...ReportStatus.all.map((s) => ListTile(
+            title: Text(s),
+            trailing: currentStatus == s ? const Icon(Icons.check, color: Colors.blue) : null,
+            onTap: () => Navigator.pop(context, s),
+          )),
         ],
       ),
     );
