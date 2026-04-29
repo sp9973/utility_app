@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
+import 'package:utility_app/features/citizen/models/report_model.dart';
 
 class _LeaderEntry {
   final String email;
@@ -28,78 +30,105 @@ class Leaderboard extends StatefulWidget {
 
 class _LeaderboardState extends State<Leaderboard> {
   List<_LeaderEntry> _entries = [];
+  Map<String, int> _categoryData = {};
+  Map<String, int> _statusData = {};
   bool _loading = true;
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
-    _loadLeaderboard();
+    // No manual _loadLeaderboard call needed as StreamBuilder handles it
   }
 
-  Future<void> _loadLeaderboard() async {
-    setState(() => _loading = true);
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final usersSnap = await firestore
-          .collection(AppCollections.users)
-          .where('role', isEqualTo: 'citizen')
-          .get();
+  List<_LeaderEntry> _aggregateLeaderboard(List<ReportModel> reports) {
+    Map<String, _LeaderEntry> userStats = {};
 
-      List<_LeaderEntry> entries = [];
-      for (final userDoc in usersSnap.docs) {
-        final uid = userDoc.id;
-        final email = userDoc.data()['email'] ?? 'Unknown';
-        final reportsSnap = await firestore
-            .collection(AppCollections.reports)
-            .where('reporterId', isEqualTo: uid)
-            .get();
-        final reports = reportsSnap.docs.length;
-        final resolved = reportsSnap.docs
-            .where((d) => d.data()['status'] == ReportStatus.resolved)
-            .length;
-        final points = resolved * 20 + reports * 5;
-        entries.add(_LeaderEntry(
-          email: email,
-          uid: uid,
-          reports: reports,
-          resolved: resolved,
-          points: points,
-        ));
+    for (var r in reports) {
+      final rid = r.reporterId;
+      final rName = r.reporterName;
+      final status = r.status;
+
+      if (rid.isNotEmpty) {
+        final isResolved = status == ReportStatus.resolved;
+        final existing = userStats[rid];
+
+        if (existing == null) {
+          userStats[rid] = _LeaderEntry(
+            uid: rid,
+            email: rName,
+            reports: 1,
+            resolved: isResolved ? 1 : 0,
+            points: isResolved ? 25 : 5,
+          );
+        } else {
+          userStats[rid] = _LeaderEntry(
+            uid: rid,
+            email: existing.email,
+            reports: existing.reports + 1,
+            resolved: existing.resolved + (isResolved ? 1 : 0),
+            points: existing.points + (isResolved ? 25 : 5),
+          );
+        }
       }
-      entries.sort((a, b) => b.points.compareTo(a.points));
-      setState(() {
-        _entries = entries;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
     }
+
+    final entries = userStats.values.toList();
+    entries.sort((a, b) => b.points.compareTo(a.points));
+    return entries;
+  }
+
+  Map<String, int> _aggregateCategories(List<ReportModel> reports) {
+    Map<String, int> categories = {};
+    for (var r in reports) {
+      categories[r.category] = (categories[r.category] ?? 0) + 1;
+    }
+    return categories;
+  }
+
+  Map<String, int> _aggregateStatuses(List<ReportModel> reports) {
+    Map<String, int> statuses = {};
+    for (var r in reports) {
+      statuses[r.status] = (statuses[r.status] ?? 0) + 1;
+    }
+    return statuses;
   }
 
   @override
   Widget build(BuildContext context) {
-    final myIndex = _entries.indexWhere((e) => e.uid == _currentUid);
-    final myEntry = myIndex >= 0 ? _entries[myIndex] : null;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection(AppCollections.reports).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && _entries.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text("Leaderboard")),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Leaderboard",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF057060),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadLeaderboard,
+        if (snapshot.hasData) {
+          final reports = snapshot.data!.docs.map((d) => 
+            ReportModel.fromJson({...d.data() as Map<String, dynamic>, 'id': d.id})
+          ).toList();
+          
+          _entries = _aggregateLeaderboard(reports);
+          _categoryData = _aggregateCategories(reports);
+          _statusData = _aggregateStatuses(reports);
+        }
+
+        final myIndex = _entries.indexWhere((e) => e.uid == _currentUid);
+        final myEntry = myIndex >= 0 ? _entries[myIndex] : null;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Leaderboard",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF057060),
+            foregroundColor: Colors.white,
           ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadLeaderboard,
-              child: SingleChildScrollView(
+          body: RefreshIndicator(
+            onRefresh: () async {}, // Stream handles it
+            child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
@@ -142,6 +171,8 @@ class _LeaderboardState extends State<Leaderboard> {
                         ],
                       ),
                     ),
+
+                    _buildChartsSection(),
 
                     // Top 3 podium
                     if (_entries.isNotEmpty)
@@ -232,6 +263,126 @@ class _LeaderboardState extends State<Leaderboard> {
                 ),
               ),
             ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChartsSection() {
+    if (_categoryData.isEmpty && _statusData.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("📊 Community Insights",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildBarChart(
+                  "By Category",
+                  _categoryData,
+                  const [Color(0xFF057060), Color(0xFF00BFA5)],
+                ),
+                const SizedBox(width: 16),
+                _buildBarChart(
+                  "By Status",
+                  _statusData,
+                  const [Color(0xFFF7971E), Color(0xFFFFD200)],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarChart(String title, Map<String, int> data, List<Color> colors) {
+    if (data.isEmpty) return const SizedBox.shrink();
+
+    final maxVal = data.values.fold(0, (prev, curr) => curr > prev ? curr : prev).toDouble();
+    final items = data.entries.toList();
+
+    return Container(
+      width: 280,
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxVal + 1,
+                barTouchData: BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= items.length) return const SizedBox.shrink();
+                        final label = items[value.toInt()].key;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            label.length > 5 ? "${label.substring(0, 5)}.." : label,
+                            style: const TextStyle(fontSize: 10, color: Colors.black54),
+                          ),
+                        );
+                      },
+                      reservedSize: 28,
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: items.asMap().entries.map((e) {
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: e.value.value.toDouble(),
+                        gradient: LinearGradient(
+                          colors: colors,
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

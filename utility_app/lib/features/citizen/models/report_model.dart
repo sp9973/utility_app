@@ -12,6 +12,7 @@ class ReportModel {
   String reporterId;
   double? latitude;
   double? longitude;
+  String? address;
 
   ReportModel({
     required this.id,
@@ -25,6 +26,7 @@ class ReportModel {
     this.reporterId = '',
     this.latitude,
     this.longitude,
+    this.address,
   }) : createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
@@ -39,6 +41,7 @@ class ReportModel {
         'reporterId': reporterId,
         'latitude': latitude,
         'longitude': longitude,
+        'address': address,
       };
 
   factory ReportModel.fromJson(Map<String, dynamic> json) => ReportModel(
@@ -55,5 +58,6 @@ class ReportModel {
         reporterId: json['reporterId'] as String? ?? '',
         latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
         longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+        address: json['address'] as String?,
       );
 }
