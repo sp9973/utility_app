@@ -12,57 +12,55 @@ class CitizenService {
     return _firestore
         .collection(AppCollections.reports)
         .where('reporterId', isEqualTo: _uid)
-        // No orderBy to avoid composite index requirement — sort client-side
         .snapshots()
         .map((s) {
-          final list = s.docs.map((d) {
-            final data = d.data();
-            data['id'] = d.id;
-            return ReportModel.fromJson(data);
-          }).toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
+      final list = s.docs.map((d) {
+        final data = d.data();
+        data['id'] = d.id;
+        return ReportModel.fromJson(data);
+      }).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
+  /// Calculates citizen stats without reading the restricted 'users' collection.
+  /// It aggregates data from the 'reports' collection which is accessible.
   Future<Map<String, dynamic>> getCitizenStats() async {
     try {
-      final snap = await _firestore
-          .collection(AppCollections.reports)
-          .where('reporterId', isEqualTo: _uid)
-          .get();
+      // Fetch all reports to calculate rank and stats locally
+      // (This is okay as long as report volume isn't in the millions)
+      final allReportsSnap = await _firestore.collection(AppCollections.reports).get();
+      final allReports = allReportsSnap.docs.map((d) {
+        final data = d.data();
+        data['id'] = d.id;
+        return ReportModel.fromJson(data);
+      }).toList();
 
-      final reports = snap.docs;
-      final resolved =
-          reports.where((d) => d.data()['status'] == ReportStatus.resolved).length;
-      final points = resolved * 20 + reports.length * 5;
+      final myReports = allReports.where((r) => r.reporterId == _uid).toList();
+      final myResolved = myReports.where((r) => r.status == ReportStatus.resolved).length;
+      final myPoints = myResolved * 25 + myReports.length * 5;
 
-      int rank = 1;
-      try {
-        final allUsersSnap = await _firestore
-            .collection(AppCollections.users)
-            .where('role', isEqualTo: 'citizen')
-            .get();
-
-        for (final user in allUsersSnap.docs) {
-          if (user.id == _uid) continue;
-          final otherSnap = await _firestore
-              .collection(AppCollections.reports)
-              .where('reporterId', isEqualTo: user.id)
-              .get();
-          if (otherSnap.docs.length > reports.length) rank++;
-        }
-      } catch (e) {
-        print("Failed to calculate rank: $e");
+      // Calculate rank locally by aggregating points for all users found in reports
+      Map<String, int> userPoints = {};
+      for (var r in allReports) {
+        final rid = r.reporterId;
+        if (rid.isEmpty) continue;
+        final isResolved = r.status == ReportStatus.resolved;
+        userPoints[rid] = (userPoints[rid] ?? 0) + (isResolved ? 25 : 5);
       }
 
+      final sortedScores = userPoints.values.toList()..sort((a, b) => b.compareTo(a));
+      int rank = sortedScores.indexOf(myPoints) + 1;
+      if (rank <= 0) rank = 1;
+
       return {
-        'totalReports': reports.length,
-        'points': points,
+        'totalReports': myReports.length,
+        'points': myPoints,
         'rank': rank,
       };
     } catch (e) {
-      print("Citizen stats lookup error: $e");
+      print("Citizen stats calculation error: $e");
       return {
         'totalReports': 0,
         'points': 0,
@@ -81,6 +79,10 @@ class CitizenService {
               final data = d.data();
               data['id'] = d.id;
               return ReportModel.fromJson(data);
-            }).toList());
+            }).toList())
+        .handleError((e) {
+      print("Nearby reports stream error: $e");
+      return <ReportModel>[];
+    });
   }
 }

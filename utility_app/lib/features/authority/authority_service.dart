@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
 
@@ -14,11 +15,17 @@ class AuthorityService {
       query = query.where('status', isEqualTo: statusFilter);
     }
 
-    return query.snapshots().map((s) => s.docs.map((d) {
-          final data = d.data();
-          data['id'] = d.id;
-          return ReportModel.fromJson(data);
-        }).toList());
+    return query
+        .snapshots()
+        .map((s) => s.docs.map((d) {
+              final data = d.data();
+              data['id'] = d.id;
+              return ReportModel.fromJson(data);
+            }).toList())
+        .handleError((e) {
+      print("Authority report stream error: $e");
+      return <ReportModel>[];
+    });
   }
 
   Future<void> updateStatus(String reportId, String newStatus) async {
@@ -29,14 +36,31 @@ class AuthorityService {
   }
 
   Stream<Map<String, int>> getDashboardStatsStream() {
-    return _firestore.collection(AppCollections.reports).snapshots().map((snap) {
-      final docs = snap.docs;
-      return {
-        'total': docs.length,
-        'pending': docs.where((d) => d.data()['status'] == ReportStatus.pending).length,
-        'inProgress': docs.where((d) => d.data()['status'] == ReportStatus.inProgress).length,
-        'resolved': docs.where((d) => d.data()['status'] == ReportStatus.resolved).length,
-      };
-    });
+    return _firestore
+        .collection(AppCollections.reports)
+        .snapshots()
+        .map((snap) {
+          final docs = snap.docs;
+          return {
+            'total': docs.length,
+            'pending': docs
+                .where((d) =>
+                    (d.data()['status'] ?? ReportStatus.pending) ==
+                    ReportStatus.pending)
+                .length,
+            'inProgress': docs
+                .where((d) => d.data()['status'] == ReportStatus.inProgress)
+                .length,
+            'resolved': docs
+                .where((d) => d.data()['status'] == ReportStatus.resolved)
+                .length,
+          };
+        })
+        .onErrorReturn({
+          'total': 0,
+          'pending': 0,
+          'inProgress': 0,
+          'resolved': 0,
+        });
   }
 }
