@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
@@ -21,6 +20,12 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
   String _selectedFilter = '';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  // Cache streams with lazy initialization to prevent LateInitializationError during hot reload
+  late final Stream<Map<String, int>> _statsStream = _service.getDashboardStatsStream();
+  // We use a function for this one because it depends on the filter
+  Stream<List<ReportModel>> get _reportsStream => _service.getAllReports(
+      statusFilter: _selectedFilter.isEmpty ? null : _selectedFilter);
 
   @override
   void dispose() {
@@ -47,22 +52,34 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
       builder: (_) => _StatusPickerSheet(currentStatus: report.status),
     );
     if (newStatus != null && newStatus != report.status) {
-      await _service.updateStatus(report.id, newStatus);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF0A4D68),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text('Status updated to "$newStatus"'),
-              ],
+      try {
+        await _service.updateStatus(report.id, newStatus);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF0A4D68),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Status updated to "$newStatus"'),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              content: Text('Failed to update status: Permission Denied'),
+            ),
+          );
+        }
       }
     }
   }
@@ -150,7 +167,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
         children: [
           // ─── Real-time stats banner ───────────────────────────────
           StreamBuilder<Map<String, int>>(
-            stream: _service.getDashboardStatsStream(),
+            stream: _statsStream,
             builder: (ctx, snap) {
               final stats = snap.data ?? {};
               return Container(
@@ -237,8 +254,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
           // ─── Reports list ─────────────────────────────────────────
           Expanded(
             child: StreamBuilder<List<ReportModel>>(
-              stream: _service.getAllReports(
-                  statusFilter: _selectedFilter.isEmpty ? null : _selectedFilter),
+              stream: _reportsStream,
               builder: (ctx, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -250,7 +266,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
                       children: [
                         Icon(Icons.error_outline, size: 56, color: Colors.red.shade300),
                         const SizedBox(height: 12),
-                        Text("Failed to load reports",
+                         Text("Failed to load reports",
                             style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
                         const SizedBox(height: 8),
                         Text(snap.error.toString(),
@@ -323,7 +339,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0A4D68).withValues(alpha: 0.08),
+                                        color: const Color(0xFF0A4D68).withOpacity(0.08),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Icon(_categoryIcon(r.category),
@@ -438,7 +454,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -464,7 +480,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
         label: Text(label),
         selected: selected,
         onSelected: (_) => setState(() => _selectedFilter = value),
-        selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.15),
+        selectedColor: const Color(0xFF0A4D68).withOpacity(0.15),
         checkmarkColor: const Color(0xFF0A4D68),
         backgroundColor: Colors.white,
         side: BorderSide(

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
 import 'package:utility_app/features/auth/models/user_model.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
@@ -6,36 +7,65 @@ import 'package:utility_app/features/citizen/models/report_model.dart';
 class AdminService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<Map<String, dynamic>> getAdminStats() async {
-    final reportsSnap =
-        await _firestore.collection(AppCollections.reports).get();
-    final usersSnap = await _firestore.collection(AppCollections.users).get();
-    final docs = reportsSnap.docs;
+  Stream<Map<String, dynamic>> getAdminStatsStream() {
+    final reportsStream = _firestore
+        .collection(AppCollections.reports)
+        .snapshots()
+        .map<QuerySnapshot<Map<String, dynamic>>?>((s) => s)
+        .onErrorReturn(null);
 
-    final resolved =
-        docs.where((d) => d.data()['status'] == ReportStatus.resolved).length;
-    final pending =
-        docs.where((d) => d.data()['status'] == ReportStatus.pending).length;
-    final inProgress = docs
-        .where((d) => d.data()['status'] == ReportStatus.inProgress)
-        .length;
+    final usersStream = _firestore
+        .collection(AppCollections.users)
+        .snapshots()
+        .map<QuerySnapshot<Map<String, dynamic>>?>((s) => s)
+        .onErrorReturn(null);
 
-    double resolutionRate =
-        docs.isEmpty ? 0 : (resolved / docs.length * 100);
+    return Rx.combineLatest2<QuerySnapshot<Map<String, dynamic>>?,
+            QuerySnapshot<Map<String, dynamic>>?, Map<String, dynamic>>(
+        reportsStream,
+        usersStream, (reportsSnap, usersSnap) {
+      final docs = reportsSnap?.docs ?? [];
+      final resolved = docs
+          .where((d) =>
+              (d.data()['status'] ?? ReportStatus.pending) ==
+              ReportStatus.resolved)
+          .length;
+      final pending = docs
+          .where((d) =>
+              (d.data()['status'] ?? ReportStatus.pending) ==
+              ReportStatus.pending)
+          .length;
+      final inProgress = docs
+          .where((d) =>
+              (d.data()['status'] ?? ReportStatus.pending) ==
+              ReportStatus.inProgress)
+          .length;
 
-    return {
-      'totalReports': docs.length,
-      'resolved': resolved,
-      'pending': pending,
-      'inProgress': inProgress,
-      'resolutionRate': resolutionRate,
-      'totalUsers': usersSnap.docs.length,
-    };
+      double resolutionRate =
+          docs.isEmpty ? 0.0 : (resolved / docs.length * 100);
+
+      return {
+        'totalReports': docs.length,
+        'resolved': resolved,
+        'pending': pending,
+        'inProgress': inProgress,
+        'resolutionRate': resolutionRate,
+        'totalUsers': usersSnap?.docs.length ?? 0,
+        'hasUserPermission': usersSnap != null,
+        'hasReportPermission': reportsSnap != null,
+      };
+    });
   }
 
   Stream<List<UserModel>> getAllUsers() {
-    return _firestore.collection(AppCollections.users).snapshots().map((s) =>
-        s.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList());
+    return _firestore
+        .collection(AppCollections.users)
+        .snapshots()
+        .map((s) => s.docs.map((d) => UserModel.fromJson(d.data(), d.id)).toList())
+        .handleError((e) {
+      print("Permission denied or error fetching users: $e");
+      return <UserModel>[];
+    });
   }
 
   Stream<List<ReportModel>> getAllReports() {
@@ -47,7 +77,11 @@ class AdminService {
               final data = d.data();
               data['id'] = d.id;
               return ReportModel.fromJson(data);
-            }).toList());
+            }).toList())
+        .handleError((e) {
+      print("Permission denied or error fetching reports: $e");
+      return <ReportModel>[];
+    });
   }
 
   Future<void> updateUserRole(String uid, String newRole) async {
