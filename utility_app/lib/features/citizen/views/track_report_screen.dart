@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
 import 'package:utility_app/features/citizen/views/report_issue_screen.dart';
 import 'package:utility_app/features/citizen/views/report_details_screen.dart';
+import 'package:utility_app/core/i18n/translation_service.dart';
 
 class TrackReportScreen extends StatelessWidget {
   TrackReportScreen({super.key});
@@ -101,9 +102,9 @@ class TrackReportScreen extends StatelessWidget {
             pinned: true,
             backgroundColor: const Color(0xFF057060),
             elevation: 0,
-            title: const Text(
-              'Report History',
-              style: TextStyle(
+            title: Text(
+              context.translate('track_reports'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -159,9 +160,9 @@ class TrackReportScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Your History',
-                          style: TextStyle(
+                        Text(
+                          context.translate('my_reports'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
@@ -294,9 +295,9 @@ class TrackReportScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-          label: const Text(
-            'New Report',
-            style: TextStyle(
+          label: Text(
+            context.translate('report_issue'),
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 15,
@@ -520,6 +521,15 @@ class _ReportCard extends StatelessWidget {
                         icon: Icons.person_rounded,
                         label: r.reporterName,
                       ),
+                      if (r.address != null) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _FooterChip(
+                            icon: Icons.location_on_rounded,
+                            label: r.address!,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -560,6 +570,7 @@ class _FooterChip extends StatelessWidget {
               fontSize: 11.5,
               color: Color(0xFF6B7280),
               fontWeight: FontWeight.w500,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -597,9 +608,9 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'No reports yet',
-              style: TextStyle(
+            Text(
+              context.translate('no_reports'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF111827),

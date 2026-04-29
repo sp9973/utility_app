@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:flutter/material.dart';
 import 'package:utility_app/features/admin/admin_service.dart';
 import 'package:utility_app/features/auth/models/user_model.dart';
@@ -384,6 +386,17 @@ class _AdminDashboardState extends State<AdminDashboard>
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (r.latitude != null && r.longitude != null)
+                            IconButton(
+                              icon: const Icon(Icons.location_on_outlined, size: 20, color: Colors.green),
+                              tooltip: 'View on Map',
+                              onPressed: () async {
+                                final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${r.latitude},${r.longitude}');
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                            ),
                           IconButton(
                             icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
                             onPressed: () => _changeStatus(r),

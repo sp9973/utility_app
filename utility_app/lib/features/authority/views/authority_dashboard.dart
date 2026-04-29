@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -697,6 +699,46 @@ class _ReportDetailSheet extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: _buildImage(r.imagePath),
+                ),
+              ],
+              if (r.latitude != null && r.longitude != null) ...[
+                const SizedBox(height: 24),
+                const Text("Location",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Color(0xFF0A4D68), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Coords: ${r.latitude!.toStringAsFixed(4)}, ${r.longitude!.toStringAsFixed(4)}${r.address != null ? ' (${r.address})' : ''}",
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${r.latitude},${r.longitude}');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.map_outlined, size: 14),
+                        label: const Text("View Map", style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF0A4D68),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 24),

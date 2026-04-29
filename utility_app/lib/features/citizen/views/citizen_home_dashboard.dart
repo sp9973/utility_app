@@ -8,6 +8,11 @@ import 'package:utility_app/features/citizen/views/report_issue_screen.dart';
 import 'package:utility_app/features/citizen/views/track_report_screen.dart';
 import 'package:utility_app/features/citizen/views/report_details_screen.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
+import 'package:utility_app/core/constants/app_constants.dart';
+import 'package:utility_app/core/i18n/translation_service.dart';
+import 'package:utility_app/core/i18n/language_provider.dart';
+import 'package:provider/provider.dart';
+
 
 class CitizenHomeDashboard extends StatefulWidget {
   const CitizenHomeDashboard({super.key});
@@ -33,19 +38,17 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
 
   Future<void> _loadStats() async {
     if (!mounted) return;
-    setState(() => _loadingStats = true);
     
+    // Rank still needs a manual fetch or a more complex stream
     try {
       final stats = await _service.getCitizenStats();
       if (mounted) {
         setState(() {
-          userReports = stats['totalReports'] ?? 0;
-          userPoints = stats['points'] ?? 0;
           userRank = stats['rank'] ?? 1;
         });
       }
     } catch (e) {
-      print("Error loading citizen stats: $e");
+      print("Error loading citizen rank: $e");
     }
 
     try {
@@ -108,11 +111,16 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF057060),
         elevation: 0,
-        title: const Text(
-          "Citizen Dashboard",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          context.translate('citizen_dashboard'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.language, color: Colors.white),
+            tooltip: 'Change Language',
+            onPressed: () => _showLanguagePicker(context),
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Logout',
@@ -160,7 +168,7 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Hello, ${userEmail.split('@').first} 👋",
+                      "${context.translate('hello')}, ${userEmail.split('@').first} 👋",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -168,9 +176,9 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      "Ready to make your city better?",
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    Text(
+                      context.translate('ready_to_make_city_better'),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -189,16 +197,23 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    _loadingStats
-                        ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildStatBox("My Reports", "$userReports", Icons.description_outlined),
-                              _buildStatBox("Points", "$userPoints", Icons.stars_rounded),
-                              _buildStatBox("Rank", "#$userRank", Icons.leaderboard_outlined),
-                            ],
-                          ),
+                    StreamBuilder<List<ReportModel>>(
+                      stream: _service.getMyReports(),
+                      builder: (ctx, snap) {
+                        final reports = snap.data ?? [];
+                        final resolved = reports.where((r) => r.status == ReportStatus.resolved).length;
+                        final points = resolved * 20 + reports.length * 5;
+                        
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildStatBox(context.translate('my_reports'), "${reports.length}", Icons.description_outlined),
+                            _buildStatBox(context.translate('points'), "$points", Icons.stars_rounded),
+                            _buildStatBox(context.translate('rank'), "#$userRank", Icons.leaderboard_outlined),
+                          ],
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -214,8 +229,8 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Latest Activity",
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(context.translate('latest_activity'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 12),
                       _buildLatestReportCard(report),
                       const SizedBox(height: 25),
@@ -225,8 +240,8 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
               ),
 
               // Quick Actions
-              const Text("Quick Actions",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(context.translate('quick_actions'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -242,19 +257,19 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                   children: [
                     _quickAction(
                       icon: Icons.report_problem,
-                      label: "Report Issue",
+                      label: context.translate('report_issue'),
                       onTap: () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) => const ReportIssueScreen())),
                     ),
                     _quickAction(
                       icon: Icons.track_changes,
-                      label: "Track Reports",
+                      label: context.translate('track_reports'),
                       onTap: () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) => TrackReportScreen())),
                     ),
                     _quickAction(
                       icon: Icons.leaderboard,
-                      label: "Leaderboard",
+                      label: context.translate('leaderboard'),
                       onTap: () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) => const Leaderboard())),
                     ),
@@ -268,8 +283,8 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Recent City Issues",
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(context.translate('recent_city_issues'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   TextButton(
                     onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => TrackReportScreen())),
@@ -303,9 +318,9 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
               const SizedBox(height: 25),
 
               // ── Map Section ──────────────────────────────────────────────
-              const Text(
-                "City Map",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Text(
+                context.translate('city_map'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 12),
               Container(
@@ -343,22 +358,22 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                     ),
                     const SizedBox(width: 16),
                     // Text column
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "View Issues on Map",
-                            style: TextStyle(
+                            context.translate('view_issues_on_map'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            "See reported problems across the city",
-                            style: TextStyle(
+                            context.translate('see_reported_problems'),
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),
@@ -380,9 +395,9 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
                         ),
                       ),
                       icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text(
-                        "Open Map",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      label: Text(
+                        context.translate('open_map'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -500,6 +515,44 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
           Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+
+  void _showLanguagePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final lp = Provider.of<LanguageProvider>(context, listen: false);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.translate('select_language'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _langTile(lp, "English", "en"),
+              _langTile(lp, "Hindi (हिंदी)", "hi"),
+              _langTile(lp, "Spanish (Español)", "es"),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _langTile(LanguageProvider lp, String title, String code) {
+    final isSelected = lp.currentLocale.languageCode == code;
+    return ListTile(
+      title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF057060)) : null,
+      onTap: () {
+        lp.changeLanguage(code);
+        Navigator.pop(context);
+      },
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
+import 'package:utility_app/features/citizen/models/report_model.dart';
 
 class _LeaderEntry {
   final String email;
@@ -37,123 +38,97 @@ class _LeaderboardState extends State<Leaderboard> {
   @override
   void initState() {
     super.initState();
-    _loadLeaderboard();
+    // No manual _loadLeaderboard call needed as StreamBuilder handles it
   }
 
-  Future<void> _loadLeaderboard() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    final firestore = FirebaseFirestore.instance;
-    try {
-      debugPrint("Fetching all reports for leaderboard aggregation...");
-      // Citizens are often allowed to read all reports, but not all users.
-      // We aggregate leaderboard stats directly from the report documents.
-      final reportsSnap = await firestore
-          .collection(AppCollections.reports)
-          .get();
+  List<_LeaderEntry> _aggregateLeaderboard(List<ReportModel> reports) {
+    Map<String, _LeaderEntry> userStats = {};
 
-      debugPrint("Found ${reportsSnap.docs.length} reports total.");
+    for (var r in reports) {
+      final rid = r.reporterId;
+      final rName = r.reporterName;
+      final status = r.status;
 
-      Map<String, int> categories = {};
-      Map<String, int> statuses = {};
-      Map<String, _LeaderEntry> userStats = {};
+      if (rid.isNotEmpty) {
+        final isResolved = status == ReportStatus.resolved;
+        final existing = userStats[rid];
 
-      for (var doc in reportsSnap.docs) {
-        final data = doc.data();
-        final cat = data['category']?.toString() ?? 'Other';
-        final status = data['status']?.toString() ?? 'Pending';
-        final rid = data['reporterId']?.toString() ?? '';
-        final rName = data['reporterName']?.toString() ?? 'Citizen';
-
-        // Global stats for charts
-        categories[cat] = (categories[cat] ?? 0) + 1;
-        statuses[status] = (statuses[status] ?? 0) + 1;
-
-        if (rid.isNotEmpty) {
-          final isResolved = status == ReportStatus.resolved;
-          final existing = userStats[rid];
-          
-          if (existing == null) {
-            userStats[rid] = _LeaderEntry(
-              uid: rid,
-              email: rName, 
-              reports: 1,
-              resolved: isResolved ? 1 : 0,
-              points: isResolved ? 25 : 5,
-            );
-          } else {
-            userStats[rid] = _LeaderEntry(
-              uid: rid,
-              email: existing.email,
-              reports: existing.reports + 1,
-              resolved: existing.resolved + (isResolved ? 1 : 0),
-              points: existing.points + (isResolved ? 25 : 5),
-            );
-          }
+        if (existing == null) {
+          userStats[rid] = _LeaderEntry(
+            uid: rid,
+            email: rName,
+            reports: 1,
+            resolved: isResolved ? 1 : 0,
+            points: isResolved ? 25 : 5,
+          );
+        } else {
+          userStats[rid] = _LeaderEntry(
+            uid: rid,
+            email: existing.email,
+            reports: existing.reports + 1,
+            resolved: existing.resolved + (isResolved ? 1 : 0),
+            points: existing.points + (isResolved ? 25 : 5),
+          );
         }
-      }
-
-      final entries = userStats.values.toList();
-      entries.sort((a, b) => b.points.compareTo(a.points));
-      
-      if (mounted) {
-        setState(() {
-          _entries = entries;
-          _categoryData = categories;
-          _statusData = statuses;
-          _loading = false;
-        });
-      }
-    } catch (e, stack) {
-      debugPrint("Leaderboard critical error: $e");
-      debugPrint(stack.toString());
-      
-      // Final Fallback: if even reading reports is blocked, try reading only MY reports
-      try {
-        final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-        final mySnap = await firestore
-            .collection(AppCollections.reports)
-            .where('reporterId', isEqualTo: myUid)
-            .get();
-        
-        if (mounted && _entries.isEmpty) {
-           // We could at least show the user's own stats here
-           // but the goal is to fix the crash/empty screen
-        }
-      } catch (_) {}
-
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e. Try refreshing.")),
-        );
       }
     }
+
+    final entries = userStats.values.toList();
+    entries.sort((a, b) => b.points.compareTo(a.points));
+    return entries;
+  }
+
+  Map<String, int> _aggregateCategories(List<ReportModel> reports) {
+    Map<String, int> categories = {};
+    for (var r in reports) {
+      categories[r.category] = (categories[r.category] ?? 0) + 1;
+    }
+    return categories;
+  }
+
+  Map<String, int> _aggregateStatuses(List<ReportModel> reports) {
+    Map<String, int> statuses = {};
+    for (var r in reports) {
+      statuses[r.status] = (statuses[r.status] ?? 0) + 1;
+    }
+    return statuses;
   }
 
   @override
   Widget build(BuildContext context) {
-    final myIndex = _entries.indexWhere((e) => e.uid == _currentUid);
-    final myEntry = myIndex >= 0 ? _entries[myIndex] : null;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection(AppCollections.reports).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && _entries.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text("Leaderboard")),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Leaderboard",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF057060),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadLeaderboard,
+        if (snapshot.hasData) {
+          final reports = snapshot.data!.docs.map((d) => 
+            ReportModel.fromJson({...d.data() as Map<String, dynamic>, 'id': d.id})
+          ).toList();
+          
+          _entries = _aggregateLeaderboard(reports);
+          _categoryData = _aggregateCategories(reports);
+          _statusData = _aggregateStatuses(reports);
+        }
+
+        final myIndex = _entries.indexWhere((e) => e.uid == _currentUid);
+        final myEntry = myIndex >= 0 ? _entries[myIndex] : null;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Leaderboard",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: const Color(0xFF057060),
+            foregroundColor: Colors.white,
           ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadLeaderboard,
-              child: SingleChildScrollView(
+          body: RefreshIndicator(
+            onRefresh: () async {}, // Stream handles it
+            child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   children: [
@@ -288,6 +263,8 @@ class _LeaderboardState extends State<Leaderboard> {
                 ),
               ),
             ),
+        );
+      },
     );
   }
 

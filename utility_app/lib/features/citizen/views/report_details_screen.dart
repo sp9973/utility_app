@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class ReportDetailsScreen extends StatelessWidget {
   final ReportModel report;
@@ -97,6 +99,62 @@ class ReportDetailsScreen extends StatelessWidget {
                         r.description,
                         style: TextStyle(color: Colors.grey.shade700, height: 1.5),
                       ),
+                      const SizedBox(height: 24),
+                      if (r.latitude != null && r.longitude != null) ...[
+                        const Text(
+                          "Location",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF057060).withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.location_on, color: Color(0xFF057060), size: 20),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Location", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    Text("${r.latitude!.toStringAsFixed(4)}, ${r.longitude!.toStringAsFixed(4)}${r.address != null ? ' (${r.address})' : ''}",
+                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${r.latitude},${r.longitude}');
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                icon: const Icon(Icons.map, size: 16),
+                                label: const Text("Open Map", style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF057060),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                       const SizedBox(height: 32),
                       const Text(
                         "Resolution Progress",
@@ -129,23 +187,25 @@ class ReportDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildTimeline(ReportModel r) {
+    final isRejected = r.status == ReportStatus.rejected;
+    
     final steps = [
       {'title': 'Issue Reported', 'subtitle': 'Report received by authorities'},
       {'title': 'Acknowledged', 'subtitle': 'Staff assigned to investigate'},
       {'title': 'In Progress', 'subtitle': 'Work is currently underway'},
-      {'title': 'Resolved', 'subtitle': 'Issue resolved and verified'},
+      {'title': isRejected ? 'Rejected' : 'Resolved', 'subtitle': isRejected ? 'Issue could not be addressed' : 'Issue resolved and verified'},
     ];
 
     int currentStep = 0;
-    if (r.status == 'Pending') currentStep = 1;
-    if (r.status == 'In Progress') currentStep = 3; // Jump to work in progress
-    if (r.status == 'Resolved') currentStep = 4;
+    if (r.status == ReportStatus.pending) currentStep = 1;
+    if (r.status == ReportStatus.inProgress) currentStep = 3; 
+    if (r.status == ReportStatus.resolved || isRejected) currentStep = 4;
 
     return Column(
       children: List.generate(steps.length, (index) {
         final isActive = index < currentStep;
         final isLast = index == steps.length - 1;
-        final stepColor = isActive ? const Color(0xFF057060) : Colors.grey.shade300;
+        final stepColor = isRejected && index == 3 ? Colors.red : (isActive ? const Color(0xFF057060) : Colors.grey.shade300);
 
         return IntrinsicHeight(
           child: Row(
@@ -156,12 +216,12 @@ class ReportDetailsScreen extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFF057060) : Colors.white,
+                      color: isActive ? stepColor : Colors.white,
                       border: Border.all(color: stepColor, width: 2),
                       shape: BoxShape.circle,
                     ),
                     child: isActive
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        ? Icon(isRejected && index == 3 ? Icons.close : Icons.check, size: 14, color: Colors.white)
                         : null,
                   ),
                   if (!isLast)
@@ -184,7 +244,7 @@ class ReportDetailsScreen extends StatelessWidget {
                         steps[index]['title']!,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: isActive ? Colors.black : Colors.grey,
+                          color: isActive ? (isRejected && index == 3 ? Colors.red : Colors.black) : Colors.grey,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -205,6 +265,7 @@ class ReportDetailsScreen extends StatelessWidget {
       }),
     );
   }
+
 
   String _formatDate(DateTime date) {
     return "${date.day}/${date.month}/${date.year}";

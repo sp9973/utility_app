@@ -4,6 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:utility_app/features/auth/views/splash_screen.dart';
 import 'package:utility_app/firebase_options.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:utility_app/core/i18n/language_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +31,12 @@ Future<void> main() async {
   // Run app inside a zone
   runZonedGuarded(
     () {
-      runApp(const MyApp());
+      runApp(
+        ChangeNotifierProvider(
+          create: (_) => LanguageProvider(),
+          child: const MyApp(),
+        ),
+      );
     },
     (error, stack) {
       print("Zoned Error: $error");
@@ -41,9 +49,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageProvider = Provider.of<LanguageProvider>(context);
+
     return MaterialApp(
       title: 'Smart Public Utility App',
       debugShowCheckedModeBanner: false,
+      locale: languageProvider.currentLocale,
+      supportedLocales: const [
+        Locale('en'),
+        Locale('hi'),
+        Locale('es'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
