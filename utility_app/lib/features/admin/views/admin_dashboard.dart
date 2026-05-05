@@ -6,6 +6,7 @@ import 'package:utility_app/features/auth/models/user_model.dart';
 import 'package:utility_app/features/auth/views/login_screen.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
 import 'package:utility_app/core/constants/app_constants.dart';
+import 'package:utility_app/core/widgets/app_drawer.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -119,6 +120,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgLight,
+      drawer: const AppDrawer(role: 'admin'),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
@@ -126,6 +128,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             floating: false,
             pinned: true,
             elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
             backgroundColor: primaryBlue,
             flexibleSpace: FlexibleSpaceBar(
               title: const Text('ADMIN DASHBOARD', 
@@ -141,10 +144,6 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.power_settings_new_rounded, color: Colors.white),
-                onPressed: _logout,
-              ),
               const SizedBox(width: 8),
             ],
           ),
