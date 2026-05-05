@@ -12,6 +12,7 @@ import 'package:utility_app/core/constants/app_constants.dart';
 import 'package:utility_app/core/i18n/translation_service.dart';
 import 'package:utility_app/core/i18n/language_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:utility_app/core/widgets/app_drawer.dart';
 
 
 class CitizenHomeDashboard extends StatefulWidget {
@@ -111,6 +112,7 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF057060),
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           context.translate('citizen_dashboard'),
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -121,30 +123,9 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
             tooltip: 'Change Language',
             onPressed: () => _showLanguagePicker(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF057060)),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Logout', style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true) _logout();
-            },
-          ),
         ],
       ),
+      drawer: const AppDrawer(role: 'citizen'),
       body: RefreshIndicator(
         onRefresh: _loadStats,
         child: SingleChildScrollView(
@@ -521,23 +502,57 @@ class _CitizenHomeDashboardState extends State<CitizenHomeDashboard> {
   void _showLanguagePicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         final lp = Provider.of<LanguageProvider>(context, listen: false);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(context.translate('select_language'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              _langTile(lp, "English", "en"),
-              _langTile(lp, "Hindi (हिंदी)", "hi"),
-              _langTile(lp, "Spanish (Español)", "es"),
-              const SizedBox(height: 20),
-            ],
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          builder: (_, controller) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  context.translate('select_language'),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView(
+                    controller: controller,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    children: [
+                      _langTile(lp, "English", "en"),
+                      _langTile(lp, "Hindi (हिंदी)", "hi"),
+                      _langTile(lp, "Bengali (বাংলা)", "bn"),
+                      _langTile(lp, "Telugu (తెలుగు)", "te"),
+                      _langTile(lp, "Marathi (मराठी)", "mr"),
+                      _langTile(lp, "Tamil (தமிழ்)", "ta"),
+                      _langTile(lp, "Gujarati (ગુજરાતી)", "gu"),
+                      _langTile(lp, "Punjabi (ਪੰਜਾਬੀ)", "pa"),
+                      _langTile(lp, "Kannada (ಕನ್ನಡ)", "kn"),
+                      _langTile(lp, "Spanish (Español)", "es"),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

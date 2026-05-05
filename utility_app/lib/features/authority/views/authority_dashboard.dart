@@ -7,6 +7,7 @@ import 'package:utility_app/core/constants/app_constants.dart';
 import 'package:utility_app/features/auth/views/login_screen.dart';
 import 'package:utility_app/features/authority/authority_service.dart';
 import 'package:utility_app/features/citizen/models/report_model.dart';
+import 'package:utility_app/core/widgets/app_drawer.dart';
 
 class AuthorityDashboard extends StatefulWidget {
   const AuthorityDashboard({super.key});
@@ -136,33 +137,10 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: const Color(0xFF0A4D68),
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  title: const Text('Logout'),
-                  content: const Text('Logout from authority account?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A4D68)),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Logout', style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              );
-              if (ok == true) _logout();
-            },
-          ),
-        ],
       ),
+      drawer: const AppDrawer(role: 'authority'),
       body: Column(
         children: [
           // ─── Real-time stats banner ───────────────────────────────
